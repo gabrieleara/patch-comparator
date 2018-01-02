@@ -59,13 +59,6 @@ handles.output = hObject;
 % Update handles structure
 guidata(hObject, handles);
 
-% UIWAIT makes similarity_prompt wait for user response (see UIRESUME)
-% uiwait(handles.figure1);
-
-
-% Original xyz, rgb and lab values
-% [xyz, rgb, lab, valid] = spectra2color(spectra);
-
 
 %--------------------------------------------------------------------------
 %                               CONSTANTS
@@ -81,12 +74,12 @@ perturbations = varargin{2};
 % Constants for the application
 consts = [];
 
-consts.spectra = spectra;                       % All original spectra
-consts.perturbations = perturbations;           % All possible perturbations
+consts.spectra          = spectra;              % All original spectra
+consts.perturbations    = perturbations;        % All possible perturbations
                                                 % for each spectrum
                                                 
-consts.n_spectra = n_spectra;                   % Original spectra count
-consts.n_perturbations = n_perturbations;       % Number of perturbation
+consts.n_spectra        = n_spectra;            % Original spectra count
+consts.n_perturbations  = n_perturbations;      % Number of perturbation
                                                 % per spectrum
                                                 
 consts.n_pairs = n_spectra * n_perturbations;   % Total number of pairs given
@@ -116,6 +109,9 @@ globals.visited = false(n_spectra, n_perturbations);
 globals.cur_pair_idx = 0;                       % Index of currently shown
                                                 % pair, since you can move
                                                 % back and forward
+                                                
+globals.invalid = 0;                            % Number of invalid pairs
+                                                % in the input set
 
 
 % Saving data into persistent 'handles' file
@@ -129,7 +125,7 @@ guidata(hObject, handles);
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = similarity_prompt_OutputFcn(hObject, eventdata, handles)
+function varargout = similarity_prompt_OutputFcn(~, ~, handles)
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -142,7 +138,7 @@ varargout{1} = handles.output;
 
 
 % --- Executes when user attempts to close similarity_prompt.
-function similarityPrompt_CloseRequestFcn(hObject, eventdata, handles)
+function similarityPrompt_CloseRequestFcn(~, ~, handles)
 % hObject    handle to similarity_prompt (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -150,19 +146,13 @@ function similarityPrompt_CloseRequestFcn(hObject, eventdata, handles)
 similarityPrompt_closingCallback(handles, false); 
 
 
-
-
-
-
-
 %--------------------------------------------------------------------------
 %                            BUTTON HANDLERS
 %--------------------------------------------------------------------------
 
 
-
 % --- Executes on button press in btnNext.
-function btnNext_Callback(hObject, eventdata, handles)
+function btnNext_Callback(hObject, ~, handles)
 % hObject    handle to btnNext (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -172,7 +162,7 @@ guidata(hObject, handles);
 
 
 % --- Executes on button press in btnBack.
-function btnBack_Callback(hObject, eventdata, handles)
+function btnBack_Callback(hObject, ~, handles)
 % hObject    handle to btnBack (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -182,7 +172,7 @@ guidata(hObject, handles);
 
 
 % --- Executes on button press in btnCancel.
-function btnCancel_Callback(hObject, eventdata, handles)
+function btnCancel_Callback(~, ~, handles)
 % hObject    handle to btnCancel (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -191,7 +181,7 @@ similarityPrompt_closingCallback(handles, false);
 
 
 % --- Executes on button press in btnFinish.
-function btnFinish_Callback(hObject, eventdata, handles)
+function btnFinish_Callback(~, ~, handles)
 % hObject    handle to btnFinish (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -200,7 +190,7 @@ similarityPrompt_closingCallback(handles, true);
 
 
 % --- Executes on button press in showDeltaE.
-function showDeltaE_Callback(hObject, eventdata, handles)
+function showDeltaE_Callback(hObject, ~, handles)
 % hObject    handle to showDeltaE (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -211,7 +201,7 @@ guidata(hObject, handles);
 
 
 % --- Executes during object creation, after setting all properties.
-function similarityPrompt_CreateFcn(hObject, eventdata, handles)
+function similarityPrompt_CreateFcn(hObject, ~, handles)
 % hObject    handle to similarity_prompt (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    empty - handles not created until after all CreateFcns called
@@ -219,16 +209,7 @@ function similarityPrompt_CreateFcn(hObject, eventdata, handles)
 guidata(hObject, handles);
 
 
-
-
-
-
-
-
-
 function similarityPrompt_closingCallback(handles, save_data)
-
-delete(handles.similarityPrompt);
 
 if save_data && not(isempty(handles.globals.ratings))
     
@@ -258,7 +239,7 @@ else
     fprintf('\nSimilarity Trainer: training set generation aborted by user.\n\n');
 end
 
-
+delete(handles.similarityPrompt);
 
 
 %--------------------------------------------------------------------------
@@ -266,7 +247,7 @@ end
 %--------------------------------------------------------------------------
 
 
-function [handles] = save_state(handles)
+function handles = save_state(handles)
 
 if handles.globals.cur_pair_idx < 1
     return;
@@ -281,38 +262,6 @@ pert_idx        = handles.state.pert_idx;
 handles.globals.ratings(pair_idx)               = rating;
 handles.globals.pairs(pair_idx, :)              = [spectrum_idx, pert_idx];
 handles.globals.visited(spectrum_idx, pert_idx) = true;
-
-
-
-
-
-function idx = generate_rand_idx(max_idx)
-
-idx = floor(rand()*max_idx)+1;
-if idx > max_idx
-    idx = max_idx;
-end
-
-
-function [handles, spectrum_idx, pert_idx] = generate_rand_indexes(handles)
-
-how_many_visited = length(handles.globals.ratings);
-
-if how_many_visited >= handles.consts.n_pairs
-    return;         % TODO: What to do if there is no other pair to visit
-end
-
-% NOTE: It may take some time when set is almost 100% covered, but whatever
-visited = true;
-while visited
-    spectrum_idx    = generate_rand_idx(handles.consts.n_spectra);
-    pert_idx        = generate_rand_idx(handles.consts.n_perturbations);
-
-    visited         = handles.globals.visited(spectrum_idx, pert_idx);
-end
-
-
-
 
 
 function [handles, valid] = generate_state(handles, spectrum_idx, pert_idx)
@@ -347,14 +296,14 @@ end
 handles.state.deltaE = delta_e(handles.state.orig.lab, handles.state.pert.lab);
 
 
-
 function handles = change_state(handles, move)
 
 if move == 1
     handles = save_state(handles);
+    how_many_visited = length(handles.globals.ratings);
 end
 
-% Move can be either 1, 0 or + 1
+% Move can be either -1 or +1
 handles.globals.cur_pair_idx = handles.globals.cur_pair_idx + move;
 
 if handles.globals.cur_pair_idx < 1
@@ -367,9 +316,20 @@ if idx > length(handles.globals.ratings)
     % Generating a new pair
     valid = false;
     while not(valid)
+        
+        if how_many_visited + handles.globals.invalid ...
+                >= handles.consts.n_pairs
+            similarityPrompt_closingCallback(handles, true);
+            return;
+        end
+        
         [handles, spectrum_idx, pert_idx] = generate_rand_indexes(handles);
 
         [handles, valid] = generate_state(handles, spectrum_idx, pert_idx);
+        
+        if not(valid)
+            handles.globals.invalid = handles.globals.invalid + 1;
+        end
     end
 else
     spectrum_idx    = handles.globals.pairs(idx, 1);
@@ -391,7 +351,7 @@ handles = update_deltae_tab(handles);
 handles.similarityLevel.SelectedObject = get_selected_radiobutton(handles);
 
 % Updating progressRatio
-how_many_visited = length(handles.globals.ratings);
+how_many_visited = length(handles.globals.ratings) + handles.globals.invalid;
 progressRatio = how_many_visited / handles.consts.n_pairs * 100;
 progressRatio = floor(progressRatio * 10) / 10;
 handles.progressRatio.String = strcat(mat2str(progressRatio), '/100');
@@ -403,14 +363,6 @@ patch([0 1 1 0], [1 1 0 0], handles.state.orig.rgb.');
 patch([1 2 2 1], [1 1 0 0], handles.state.pert.rgb.');
 set(handles.patches, 'XTick', []);
 set(handles.patches, 'YTick', []);
-
-
-
-
-
-
-
-
 
 
 %--------------------------------------------------------------------------
@@ -435,6 +387,7 @@ switch handles.similarityLevel.SelectedObject.Tag
     otherwise
         error('Currently selected object is invalid: %s!', handles.similarityLevel.SelectedObject.tag)
 end
+
 
 function obj = get_selected_radiobutton(handles)
 
@@ -462,14 +415,17 @@ switch rating
 end
 
 
-
 function [xyz, rgb, lab, valid] = get_current_color(handles)
+
 [xyz, rgb, lab, valid] = spectrum2color(handles.consts.spectra, ...
     handles.state.spectrum_idx);
 
+
 function [xyz, rgb, lab, valid] = get_current_pert_color(handles)
+
 [xyz, rgb, lab, valid] = pert2color(handles.consts.perturbations, ...
     handles.state.spectrum_idx, handles.state.pert_idx);
+
 
 function handles = update_deltae_tab(handles)
 
@@ -483,3 +439,21 @@ else
 end
 
 
+function idx = generate_rand_idx(max_idx)
+
+idx = floor(rand()*max_idx)+1;
+if idx > max_idx
+    idx = max_idx;
+end
+
+
+function [handles, spectrum_idx, pert_idx] = generate_rand_indexes(handles)
+
+% NOTE: It may take some time when set is almost 100% covered, but whatever
+visited = true;
+while visited
+    spectrum_idx    = generate_rand_idx(handles.consts.n_spectra);
+    pert_idx        = generate_rand_idx(handles.consts.n_perturbations);
+
+    visited         = handles.globals.visited(spectrum_idx, pert_idx);
+end

@@ -1,18 +1,16 @@
-function perturbations = generate_noise(spectra, Nperturbations)
+function perturbations = generate_noise(spectra, Nperturbations)%, Nwavelengths)
 
 [Nspectra, Nwavelengths] = size(spectra);
 
-% Preallocation
 perturbations = zeros(Nspectra, Nperturbations, Nwavelengths);
 
-% Precomputing labs to speed up performances
-[~, ~, labs] = spectra2color(spectra);
+[~, ~, labs] = spectra2color(spectra); % Precomputing labs
 
 for pertIdx = 1:Nperturbations
-    db = ((Nperturbations-pertIdx+1) * 2) + 5;
+    db = ((Nperturbations-pertIdx+1) * 2.5)^0.99;
     
-    % This was meant to speed up, but heavier colors seem to suffer from
-    % heavier noises, so I try to use a "color per color" approach
+    % This was meant to speed up, but heavier colors seem to undergo
+    % heavier noises, so I try to use a color per color approach
 %     perturbatedSig = awgn(spectra, db);
 %     for spectrumIdx = 1:Nspectra
 %         perturbations(spectrumIdx, pertIdx, :) = perturbatedSig(spectrumIdx, :);
@@ -21,10 +19,11 @@ for pertIdx = 1:Nperturbations
     % This is the alternative approach
     for spectrumIdx = 1:Nspectra
         
-        % This is used to be more aggressive on lighter colors and less
-        % aggressive on darker ones
         lab = squeeze(labs(:, spectrumIdx));
-        actualdb = db * 1 / ((lab(1) / 100)^0.75);
+        
+        actualdb
+        
+        actualdb = db * (((100 - lab(1)) / 100)^2 + 0.75);
         
         perturbatedSig = awgn(spectra(spectrumIdx, :), actualdb);
         perturbations(spectrumIdx, pertIdx, :) = perturbatedSig;
