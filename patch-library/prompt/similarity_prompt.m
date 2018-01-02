@@ -68,7 +68,7 @@ guidata(hObject, handles);
 
 
 %--------------------------------------------------------------------------
-%                                GLOBALS
+%                               CONSTANTS
 %--------------------------------------------------------------------------
 
 spectra = varargin{1};
@@ -92,6 +92,12 @@ consts.n_perturbations = n_perturbations;       % Number of perturbation
 consts.n_pairs = n_spectra * n_perturbations;   % Total number of pairs given
 
 
+%--------------------------------------------------------------------------
+%                                GLOBALS
+%--------------------------------------------------------------------------
+
+
+
 % Global variables that change over time
 globals = [];
 
@@ -112,6 +118,7 @@ globals.cur_pair_idx = 0;                       % Index of currently shown
                                                 % back and forward
 
 
+% Saving data into persistent 'handles' file
 handles.consts  = consts;
 handles.globals = globals;
 
@@ -128,16 +135,10 @@ function varargout = similarity_prompt_OutputFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Get default command line output from handles structure
-% varargout{1} = handles.output;
-
-
-% NOTICE: this is called immediately when the figure is created, so it is
-% not a good place where to put output variables, consider a better way to
-% specify output variables.
-% This is what I wanted to perform, but I cannot do it here
-% varargout{1} = handles.ratings;
-% varargout{2} = handles.pairs;
+% Get default command line output from handles structure, it is actually
+% equal to the figure itself, since it is returned as soon as the figure is
+% created
+varargout{1} = handles.output;
 
 
 % --- Executes when user attempts to close similarity_prompt.
@@ -146,8 +147,18 @@ function similarityPrompt_CloseRequestFcn(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hint: delete(hObject) closes the figure
-delete(hObject);                                % TODO: segnala cancellazione
+similarityPrompt_closingCallback(handles, false); 
+
+
+
+
+
+
+
+%--------------------------------------------------------------------------
+%                            BUTTON HANDLERS
+%--------------------------------------------------------------------------
+
 
 
 % --- Executes on button press in btnNext.
@@ -157,8 +168,8 @@ function btnNext_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 handles = change_state(handles, 1);
-
 guidata(hObject, handles);
+
 
 % --- Executes on button press in btnBack.
 function btnBack_Callback(hObject, eventdata, handles)
@@ -167,8 +178,8 @@ function btnBack_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 
 handles = change_state(handles, -1);
-
 guidata(hObject, handles);
+
 
 % --- Executes on button press in btnCancel.
 function btnCancel_Callback(hObject, eventdata, handles)
@@ -176,7 +187,8 @@ function btnCancel_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-delete(handles.similarityPrompt);           % TODO: segnala cancellazione
+similarityPrompt_closingCallback(handles, false);
+
 
 % --- Executes on button press in btnFinish.
 function btnFinish_Callback(hObject, eventdata, handles)
@@ -184,7 +196,7 @@ function btnFinish_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-delete(handles.similarityPrompt);           % TODO: segnala risultati
+similarityPrompt_closingCallback(handles, true);
 
 
 % --- Executes on button press in showDeltaE.
@@ -193,12 +205,8 @@ function showDeltaE_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-% Hint: get(hObject,'Value') returns toggle state of showDeltaE
-
 handles.state.show_deltaE = not(handles.state.show_deltaE);
-
-update_show_deltaE(handles);
-
+handles = update_deltae_tab(handles);
 guidata(hObject, handles);
 
 
@@ -211,29 +219,51 @@ function similarityPrompt_CreateFcn(hObject, eventdata, handles)
 guidata(hObject, handles);
 
 
-%--------------------------------------------------------------------------
-%------------------------ OTHER FUNCTIONS ---------------------------------
-%--------------------------------------------------------------------------
 
 
-function rating = get_rating(handles)
 
-switch handles.similarityLevel.SelectedObject.Tag
-    case 'radio0'
-        rating = 0;
-    case 'radio1'
-        rating = 1;
-    case 'radio2'
-        rating = 2;
-    case 'radio3'
-        rating = 3;
-    case 'radio4'
-        rating = 4;
-    case 'radio5'
-        rating = 5;
-    otherwise
-        error('Currently selected object is invalid: %s!', handles.similarityLevel.SelectedObject.tag)
+
+
+
+
+function similarityPrompt_closingCallback(handles, save_data)
+
+delete(handles.similarityPrompt);
+
+if save_data && not(isempty(handles.globals.ratings))
+    
+    h = msgbox('You will now be asked for a file name and location for your data.\nRemember that the default file searched when training the actual network is the one contained in folder ''train'' called ''training.mat''.');
+    waitfor(h);
+    
+    [filename, pathname] = uiputfile('training.mat', 'Save Training Data');
+
+    if not(isequal(filename,0)) && not(isequal(pathname,0))
+        savefile = fullfile(pathname,filename);
+        
+        spectra         = handles.consts.spectra;
+        perturbations   = handles.consts.perturbations;
+        ratings         = handles.globals.ratings;
+        pairs           = handles.globals.pairs;
+        
+        
+        save(savefile, ...
+            'spectra', 'perturbations', ...
+            'ratings', 'pairs');
+        
+        fprintf('\nSimilarity Trainer: data saved in the following location:\n%s\n\n', savefile);
+    else
+        fprintf('\nSimilarity Trainer: training set generation aborted by user.\n\n');
+    end
+else
+    fprintf('\nSimilarity Trainer: training set generation aborted by user.\n\n');
 end
+
+
+
+
+%--------------------------------------------------------------------------
+%                     CHANGE STATE FUNCTIONS
+%--------------------------------------------------------------------------
 
 
 function [handles] = save_state(handles)
@@ -242,16 +272,21 @@ if handles.globals.cur_pair_idx < 1
     return;
 end
 
-rating = get_rating(handles);
+rating = get_saved_rating(handles);
 
-idx = handles.globals.cur_pair_idx;
+pair_idx        = handles.globals.cur_pair_idx;
+spectrum_idx    = handles.state.spectrum_idx;
+pert_idx        = handles.state.pert_idx;
 
-handles.globals.ratings(idx) = rating;
-handles.globals.pairs(idx, :) = [handles.state.spectrum_idx, handles.state.pert_idx];
-handles.globals.visited(handles.state.spectrum_idx, handles.state.pert_idx) = true;
+handles.globals.ratings(pair_idx)               = rating;
+handles.globals.pairs(pair_idx, :)              = [spectrum_idx, pert_idx];
+handles.globals.visited(spectrum_idx, pert_idx) = true;
 
 
-function idx = rand_index(max_idx)
+
+
+
+function idx = generate_rand_idx(max_idx)
 
 idx = floor(rand()*max_idx)+1;
 if idx > max_idx
@@ -259,20 +294,25 @@ if idx > max_idx
 end
 
 
-function [handles, spectrum_idx, pert_idx] = generate_new_indexes(handles)
+function [handles, spectrum_idx, pert_idx] = generate_rand_indexes(handles)
 
 how_many_visited = length(handles.globals.ratings);
+
 if how_many_visited >= handles.consts.n_pairs
-    return;         % TODO: What to do if there are no other pairs to visit
+    return;         % TODO: What to do if there is no other pair to visit
 end
 
+% NOTE: It may take some time when set is almost 100% covered, but whatever
 visited = true;
 while visited
-    spectrum_idx    = rand_index(handles.consts.n_spectra);
-    pert_idx        = rand_index(handles.consts.n_perturbations);
+    spectrum_idx    = generate_rand_idx(handles.consts.n_spectra);
+    pert_idx        = generate_rand_idx(handles.consts.n_perturbations);
 
     visited         = handles.globals.visited(spectrum_idx, pert_idx);
 end
+
+
+
 
 
 function [handles, valid] = generate_state(handles, spectrum_idx, pert_idx)
@@ -304,9 +344,99 @@ if not(valid)
     return;
 end
 
-handles.state.deltaE = computeDeltaE(handles.state.orig.lab, handles.state.pert.lab);
+handles.state.deltaE = delta_e(handles.state.orig.lab, handles.state.pert.lab);
 
-function obj = cur_selected_object(handles)
+
+
+function handles = change_state(handles, move)
+
+if move == 1
+    handles = save_state(handles);
+end
+
+% Move can be either 1, 0 or + 1
+handles.globals.cur_pair_idx = handles.globals.cur_pair_idx + move;
+
+if handles.globals.cur_pair_idx < 1
+    handles.globals.cur_pair_idx = 1;
+end
+
+idx = handles.globals.cur_pair_idx;
+
+if idx > length(handles.globals.ratings)
+    % Generating a new pair
+    valid = false;
+    while not(valid)
+        [handles, spectrum_idx, pert_idx] = generate_rand_indexes(handles);
+
+        [handles, valid] = generate_state(handles, spectrum_idx, pert_idx);
+    end
+else
+    spectrum_idx    = handles.globals.pairs(idx, 1);
+    pert_idx        = handles.globals.pairs(idx, 2);
+    
+    handles = generate_state(handles, spectrum_idx, pert_idx);
+end
+
+handles = show_state(handles);
+
+
+function handles = show_state(handles)
+
+% Hiding deltaE value
+handles.state.show_deltaE = false;
+handles = update_deltae_tab(handles);
+
+% Showing currently selected radio button
+handles.similarityLevel.SelectedObject = get_selected_radiobutton(handles);
+
+% Updating progressRatio
+how_many_visited = length(handles.globals.ratings);
+progressRatio = how_many_visited / handles.consts.n_pairs * 100;
+progressRatio = floor(progressRatio * 10) / 10;
+handles.progressRatio.String = strcat(mat2str(progressRatio), '/100');
+
+% Showing current patches
+axis(handles.patches);
+cla(handles.patches, 'reset');
+patch([0 1 1 0], [1 1 0 0], handles.state.orig.rgb.');
+patch([1 2 2 1], [1 1 0 0], handles.state.pert.rgb.');
+set(handles.patches, 'XTick', []);
+set(handles.patches, 'YTick', []);
+
+
+
+
+
+
+
+
+
+
+%--------------------------------------------------------------------------
+%                         OTHER FUNCTIONS
+%--------------------------------------------------------------------------
+
+function rating = get_saved_rating(handles)
+
+switch handles.similarityLevel.SelectedObject.Tag
+    case 'radio0'
+        rating = 0;
+    case 'radio1'
+        rating = 1;
+    case 'radio2'
+        rating = 2;
+    case 'radio3'
+        rating = 3;
+    case 'radio4'
+        rating = 4;
+    case 'radio5'
+        rating = 5;
+    otherwise
+        error('Currently selected object is invalid: %s!', handles.similarityLevel.SelectedObject.tag)
+end
+
+function obj = get_selected_radiobutton(handles)
 
 if handles.globals.cur_pair_idx > length(handles.globals.ratings)
     obj = handles.radio0;
@@ -331,28 +461,6 @@ switch rating
         error('Unexpected rayting value: %d', rating);
 end
 
-function handles = show_state(handles)
-% Hiding deltaE value
-handles.state.show_deltaE = false;
-handles = update_show_deltaE(handles);
-
-% Showing currently selected radio button
-handles.similarityLevel.SelectedObject = cur_selected_object(handles);
-
-% Updating progressRatio
-how_many_visited = length(handles.globals.ratings);
-progressRatio = how_many_visited / handles.consts.n_pairs * 100;
-progressRatio = floor(progressRatio * 10) / 10;
-handles.progressRatio.String = strcat(mat2str(progressRatio), '/100');
-
-% Showing current patches
-axis(handles.patches);
-cla(handles.patches, 'reset');
-patch([0 1 1 0], [1 1 0 0], handles.state.orig.rgb.');
-patch([1 2 2 1], [1 1 0 0], handles.state.pert.rgb.');
-set(handles.patches, 'XTick', []);
-set(handles.patches, 'YTick', []);
-
 
 
 function [xyz, rgb, lab, valid] = get_current_color(handles)
@@ -363,9 +471,9 @@ function [xyz, rgb, lab, valid] = get_current_pert_color(handles)
 [xyz, rgb, lab, valid] = pert2color(handles.consts.perturbations, ...
     handles.state.spectrum_idx, handles.state.pert_idx);
 
-function handles = update_show_deltaE(handles)
-handles.showDeltaE.Value = handles.state.show_deltaE;
+function handles = update_deltae_tab(handles)
 
+handles.showDeltaE.Value = handles.state.show_deltaE;
 handles.textDeltaE.String = mat2str(handles.state.deltaE, 5);
 
 if(handles.state.show_deltaE)
@@ -374,48 +482,4 @@ else
     handles.textDeltaE.Visible = 'off';
 end
 
-%guidata(hObject, handles);
 
-
-
-
-
-
-
-
-
-
-function handles = change_state(handles, move)
-
-if move == 1
-    handles = save_state(handles);
-end
-
-% Move can be either 1, 0 or + 1
-handles.globals.cur_pair_idx = handles.globals.cur_pair_idx + move;
-
-if handles.globals.cur_pair_idx < 1
-    handles.globals.cur_pair_idx = 1;
-end
-
-idx = handles.globals.cur_pair_idx;
-
-if idx > length(handles.globals.ratings)
-    % Generating a new pair
-    valid = false;
-    while not(valid)
-        [handles, spectrum_idx, pert_idx] = generate_new_indexes(handles);
-
-        [handles, valid] = generate_state(handles, spectrum_idx, pert_idx);
-    end
-else
-    spectrum_idx    = handles.globals.pairs(idx, 1);
-    pert_idx        = handles.globals.pairs(idx, 2);
-    
-    handles = generate_state(handles, spectrum_idx, pert_idx);
-end
-
-handles = show_state(handles);
-
-function deltaE = computeDeltaE(lab1, lab2)
-deltaE = norm(lab1 - lab2);

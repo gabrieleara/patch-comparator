@@ -48,11 +48,11 @@ else
     end
 end
 
-clear datafolder dataset perturbationset fromfile loaded_variables perturbatedSig;
+clear datafolder dataset perturbationset fromfile loaded_variables perturbatedSig db pertIdx spectrumIdx;
 
 %%
 
-similarity_prompt(spectra, perturbations)
+fig = similarity_prompt(spectra, perturbations);
 
 end
 
