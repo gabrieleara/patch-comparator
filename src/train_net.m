@@ -1,5 +1,5 @@
-function [bestN, best_net, best_performance, mean_performances] = ...
-        train_net(inputs, outputs, neurons_range, num_training, nettype)
+function [bestN, best_net, best_performance, mean_performances, best_trainsize] = ...
+        train_net(inputs, outputs, neurons_range, num_training, nettype, trainset_sizes)
 
 %EVALUATE_MLP	Evaluates the best MLP network size N for the given problem.
 %
@@ -34,7 +34,7 @@ function [bestN, best_net, best_performance, mean_performances] = ...
 %
 
 % Variables used to update the waitbar
-waitbar_total   = length(neurons_range)*num_training;
+waitbar_total   = length(neurons_range)*num_training*length(trainset_sizes);
 waitbar_partial = 0;
 waitbar_h = waitbar(0, ['Training ' nettype ' networks...']);
 
@@ -42,18 +42,39 @@ waitbar_h = waitbar(0, ['Training ' nettype ' networks...']);
 x = inputs';
 t = outputs';
 
+[~,m] = size(x);
+
 if strcmp(nettype,'pattern')
     % The generalized add because classes for me go from 0 to 5 
     t = full(ind2vec(gadd(t,1)));
 end
 
 % Preallocation
-performances = zeros(length(neurons_range), num_training);
+performances = zeros(length(neurons_range), length(trainset_sizes), num_training);
 
 % Placeholders for outputs
 bestN               = -1;
 best_net            = [];
 best_performance    = inf;
+
+xx = cell(length(trainset_sizes), 1);
+tt = cell(length(trainset_sizes), 1);
+ttind = cell(length(trainset_sizes), 1);
+
+for k = 1:length(trainset_sizes)
+    train_size = trainset_sizes(k);
+
+    % Extract randomly a subset of the training set
+    idxs = randsample(1:m, train_size, false);
+    xx{k} = x(:, idxs);
+    tt{k} = t(:, idxs);
+    
+    if strcmp(nettype,'pattern')
+        ttind{k} = vec2ind(tt{k});
+    end
+end
+
+
 
 % i = index of the number neurons in the current network
 for i = 1:length(neurons_range)
@@ -63,36 +84,58 @@ for i = 1:length(neurons_range)
     % Initializating the network
     net = init_net(neurons_number, nettype);
     
-    % j = counter of different trainings with the same network size
-    for j = 1:num_training
+    for k = 1:length(trainset_sizes)
         
-        % Updating waitbar content, it will abort any operation if the
-        % waitbar has been closed.
-        waitbar_partial = waitbar_partial+1;
-        waitbar_update(waitbar_partial/waitbar_total, waitbar_h);
+        train_size = trainset_sizes(k);
         
-        % Training the Network
-        [net] = train(net, x, t);
+        x_ = xx{k};
+        t_ = tt{k};
+        
+        if strcmp(nettype,'pattern')
+            tind = ttind{k};
+        end
+    
+        % j = counter of different trainings with the same network size
+        for j = 1:num_training
 
-        % Testing the Network
-        y = net(x);
-        
-        % Performance is evaluated on the whole training set
-        performance = perform(net, t, y);
-        
-        % Saving data
-        performances(i, j)  = performance;
-        
-        if performance < best_performance
-            bestN               = neurons_number;
-            best_net            = net;
-            best_performance    = performance;
+            % Updating waitbar content, it will abort any operation if the
+            % waitbar has been closed.
+            waitbar_partial = waitbar_partial+1;
+            waitbar_update(waitbar_partial/waitbar_total, waitbar_h);
+
+            % Training the Network
+            [net] = train(net, x_, t_);
+
+            % Testing the Network
+            y = net(x_);
+
+            % Performance is evaluated on the whole training set
+            if strcmp(nettype,'pattern')
+                yind = vec2ind(y);
+                performance = sum(tind ~= yind)/numel(tind); % Error rate
+                
+                % Notice: this doesn't take care of the fact that an output
+                % "close" to the target may be "good" with respect to a
+                % completely different one
+            else
+                performance = perform(net, t_, y);
+            end
+
+            % Saving data
+            performances(i, k, j)  = performance;
+
+            if performance < best_performance
+                bestN               = neurons_number;
+                best_trainsize      = train_size;
+                best_net            = net;
+                best_performance    = performance;
+            end
         end
     end
 end
 
-% Obtaining mean performances for each network size
-mean_performances   = mean(performances, 2);
+% Obtaining mean performances for each network size and training size
+mean_performances   = mean(performances, 3);
 
 close(waitbar_h);
 
