@@ -45,7 +45,7 @@ end
 
 
 % --- Executes just before similarity_prompt is made visible.
-function similarity_prompt_OpeningFcn(hObject, eventdata, handles, varargin)
+function similarity_prompt_OpeningFcn(hObject, ~, handles, varargin)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -64,15 +64,38 @@ guidata(hObject, handles);
 %                               CONSTANTS
 %--------------------------------------------------------------------------
 
-spectra = varargin{1};
-perturbations = varargin{2};
+if length(varargin) < 1
+    error('Too few input arguments!');
+end
 
+if length(varargin) < 2
+    fname           = varargin{1};
+    
+    if ~exist(fname, 'file')
+        error('Invalid file name argument!');
+    end
+    
+    vars = load(fname, 'spectra', 'perturbations', 'ratings', 'pairs');
+    spectra         = vars.spectra;
+    perturbations   = vars.perturbations;
+    ratings         = vars.ratings;
+    pairs           = vars.pairs;
+else
+    fname           = '';
+    
+    spectra         = varargin{1};
+    perturbations   = varargin{2};
+    ratings         = [];
+    pairs           = [];
+end
 % The number of perturbations for each original spectrum
 [n_spectra, n_perturbations, ~] = size(perturbations);
 
 
 % Constants for the application
 consts = [];
+
+consts.fname            = fname;                % Default file name
 
 consts.spectra          = spectra;              % All original spectra
 consts.perturbations    = perturbations;        % All possible perturbations
@@ -89,15 +112,15 @@ consts.n_pairs = n_spectra * n_perturbations;   % Total number of pairs given
 %                                GLOBALS
 %--------------------------------------------------------------------------
 
-
+[n, ~] = size(pairs);
 
 % Global variables that change over time
 globals = [];
 
 % Following two will be output variables
-globals.ratings = [];                           % They will be returned to
+globals.ratings = ratings;                      % They will be returned to
                                                 % command line once finished
-globals.pairs   = [];                           % It will pair original
+globals.pairs   = pairs;                        % It will pair original
                                                 % spectra with
                                                 % perturbations analyzed
 
@@ -106,12 +129,17 @@ globals.visited = false(n_spectra, n_perturbations);
                                                 % spectra/perturbation has
                                                 % been visited already
                                                 
-globals.cur_pair_idx = 0;                       % Index of currently shown
+globals.cur_pair_idx = n;                       % Index of currently shown
                                                 % pair, since you can move
                                                 % back and forward
                                                 
 globals.invalid = 0;                            % Number of invalid pairs
                                                 % in the input set
+                                                
+
+for i = 1:n
+    globals.visited(pairs(i, 1), pairs(i,2)) = true;
+end
 
 
 % Saving data into persistent 'handles' file
@@ -119,7 +147,7 @@ handles.consts  = consts;
 handles.globals = globals;
 
 % Generating first state
-handles = change_state(handles, 1);
+handles = change_state(handles, 1, true);
 
 guidata(hObject, handles);
 
@@ -213,10 +241,15 @@ function similarityPrompt_closingCallback(handles, save_data)
 
 if save_data && not(isempty(handles.globals.ratings))
     
-    h = msgbox('You will now be asked for a file name and location for your data.\nRemember that the default file searched when training the actual network is the one contained in folder ''train'' called ''training.mat''.');
+    if isempty(handles.consts.fname)
+        h = msgbox('You will now be asked for a file name and location for your data.\nRemember that the default file searched when training the actual network is the one contained in folder ''train'' called ''training.mat''.');
+        handles.consts.fname = 'training.mat';
+    else
+        h = msgbox(['You will now be asked for a file name and location for your data.\nRemember that you initially loaded previous data from file ''' handles.consts.fname '''.']);
+    end
     waitfor(h);
     
-    [filename, pathname] = uiputfile('training.mat', 'Save Training Data');
+    [filename, pathname] = uiputfile(handles.consts.fname, 'Save Training Data');
 
     if not(isequal(filename,0)) && not(isequal(pathname,0))
         savefile = fullfile(pathname,filename);
@@ -225,7 +258,6 @@ if save_data && not(isempty(handles.globals.ratings))
         perturbations   = handles.consts.perturbations;
         ratings         = handles.globals.ratings;
         pairs           = handles.globals.pairs;
-        
         
         save(savefile, ...
             'spectra', 'perturbations', ...
@@ -239,14 +271,16 @@ else
     fprintf('\nSimilarity Trainer: training set generation aborted by user.\n\n');
 end
 
-delete(handles.similarityPrompt);
+if isfield(handles, 'similarityPrompt')
+    delete(handles.similarityPrompt);
+end
 
 
 %--------------------------------------------------------------------------
 %                     CHANGE STATE FUNCTIONS
 %--------------------------------------------------------------------------
 
-
+% TODO: some errors when comparing visited with invalid numbers, FIXME
 function handles = save_state(handles)
 
 if handles.globals.cur_pair_idx < 1
@@ -296,10 +330,16 @@ end
 handles.state.deltaE = delta_e(handles.state.orig.lab, handles.state.pert.lab);
 
 
-function handles = change_state(handles, move)
+function handles = change_state(handles, move, first_call)
+
+if nargin < 3
+    first_call = false;
+end
 
 if move == 1
-    handles = save_state(handles);
+    if ~first_call
+        handles = save_state(handles);
+    end
     how_many_visited = length(handles.globals.ratings);
 end
 
