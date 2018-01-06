@@ -31,6 +31,16 @@ params.num_training     = 3;
 params.trainset_sizes   = 100:50:200;
 params.unders           = 15:5:25;
 
+
+
+% Variables used to update the waitbar
+waitbar_total   = m * length(params.unders) * length(params.trainset_sizes);
+waitbar_partial = 0;
+waitbar_h       = waitbar(0, 'Performing various trainings on different inputs...');
+
+screenSize = get(0, 'ScreenSize');
+movegui(waitbar_h,[screenSize(3)/2 - 187, screenSize(4)/2 + 104]);
+
 for nettype_idx = 1:m
     
     if deterministic
@@ -46,15 +56,18 @@ for nettype_idx = 1:m
     nettype_data.trainset_sizes = params.trainset_sizes;
     
     % Going backwards to preallocate struct matrix
-    for unders_idx = lenght(params.unders):-1:1
+    for unders_idx = length(params.unders):-1:1
         unders_ = params.unders(unders_idx);
     
         for trainset_idx = length(params.trainset_sizes):-1:1
             size_ = params.trainset_sizes(trainset_idx);
             
-            % Filtering on
-            with_filtering(unders_idx, trainset_idx) = [];
+            % Updating waitbar content, it will abort any operation if the
+            % waitbar has been closed.
+            waitbar_partial = waitbar_partial+1;
+            waitbar_update(waitbar_partial/waitbar_total, waitbar_h);
             
+            % Filtering on
             % true = filtering on
             [inputs,outputs]  = select_input(trainset.inputs, trainset.outputs, traintype, size_, unders_, true);
 
@@ -64,8 +77,6 @@ for nettype_idx = 1:m
             with_filtering(unders_idx, trainset_idx) = trained_data;
 
             % Filtering off
-            without_filtering(unders_idx, trainset_idx) = [];
-            
             % false = filtering off
             [inputs,outputs]  = select_input(trainset.inputs, trainset.outputs, traintype, size_, unders_, false);
 
@@ -79,6 +90,8 @@ for nettype_idx = 1:m
     nettype_data.with_filtering    = with_filtering;
     nettype_data.without_filtering = without_filtering;
     
+    clear with_filtering without_filtering;
+    
     results.(type_) = nettype_data;
     
     if deterministic
@@ -86,6 +99,9 @@ for nettype_idx = 1:m
     end
     
 end
+
+close(waitbar_h);
+fprintf('Wow, it really completed!?');
 
 end
 
@@ -100,8 +116,8 @@ if train_size < n
     % Extract randomly a subset of the training set
     idxs = randsample(1:n, train_size, false);
     
-    inputs  = inputs(:, idxs);
-    outputs = outputs(:,idxs);
+    inputs  = inputs(idxs, :);
+    outputs = outputs(idxs, :);
 end
 
 if strcmp(traintype, 'spectra') && nargin > 5 && filter_

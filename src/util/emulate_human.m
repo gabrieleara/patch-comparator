@@ -62,11 +62,13 @@ end
 
 function rating = deltae2rating(deltae)
 if deltae < 1.7
+    rating = 4;
+elseif deltae < 3.6
+    rating = 3;
+elseif deltae < 7
     rating = 2;
-elseif deltae < 4.9
-    rating = 1;
 else
-    rating = 0;
+    rating = 1;
 end
 end
 

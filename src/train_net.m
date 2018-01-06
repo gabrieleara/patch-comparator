@@ -39,7 +39,7 @@ neurons_len = length(neurons_range);
 % Variables used to update the waitbar
 waitbar_total   = neurons_len * num_training;
 waitbar_partial = 0;
-waitbar_h = waitbar(0, ['Training ' nettype ' networks...']);
+waitbar_h       = waitbar(0, ['Training ' nettype ' networks...']);
 
 % x are inputs, t are targets, one per column.
 x = inputs';
@@ -113,7 +113,7 @@ for i = 1:neurons_len
             area_under_curve = 0;
             
             for posc = 1:num_labels
-                [~,~,~,auc]         = perfcurve(t,y,posc);
+                [~,~,~,auc]         = perfcurve(tind,yind,posc);
                 area_under_curve    = area_under_curve + auc;
             end
             

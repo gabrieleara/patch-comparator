@@ -2,11 +2,13 @@ if ~exist('trainset', 'var')
    load('fast_eval_simple.mat'); 
 end
 
-best_networks = train_networks(trainset, 'pattern', 'spectra');
-pattern = best_networks.pattern;
+results = train_networks(trainset, {'pattern';'fit'}, 'spectra', true);
+
+save('results.mat', 'results');
+%pattern = results.pattern;
 
 %%
-
+%{
 x = pattern.extra_data.best_x;
 t = pattern.extra_data.best_t;
 y = pattern.extra_data.best_y;
@@ -23,3 +25,4 @@ pattern.extra_data
 perf = pattern.extra_data.mean_performances;
 [~, m] = size(perf);
 step_plot;
+%}
