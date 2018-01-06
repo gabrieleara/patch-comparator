@@ -1,4 +1,4 @@
-function [best_networks] = train_networks(trainset, nettype, traintype, deterministic)
+function [results] = train_networks(trainset, nettype, traintype, deterministic)
 %TRAIN_NETWORKS Summary of this function goes here
 %   Detailed explanation goes here
 if nargin < 3
@@ -9,43 +9,78 @@ if nargin < 4
     deterministic = false;
 end
 
-best_networks	= [];
+results	= [];
+results.trainset = trainset;
 
 nettype = cellstr(nettype);
 
 [m,~] = size(nettype);
 
+%{
 params = [];
-params.neurons_range    = 10:10:150;
+params.neurons_range    = 10:5:100;
 params.num_training     = 25;
-params.trainset_sizes   = 100:50:1000;
+params.trainset_sizes   = 100:50:2000;
+params.unders           = 5:5:50;
+%}
 
-for idx = 1:m
+% Quick evaluation: remove!
+params = [];
+params.neurons_range    = 10:30:100;
+params.num_training     = 3;
+params.trainset_sizes   = 100:50:200;
+params.unders           = 15:5:25;
+
+for nettype_idx = 1:m
+    
     if deterministic
         s = rng();
         rng(1234);
     end
     
-    % TODO: add more data
+    type_ = nettype{nettype_idx};
     
-    inputs  = select_input(trainset.inputs, traintype);
-    outputs = trainset.outputs;
-
-    [bestN, net, best_performance, mean_performances, best_trainsize] = ...
-        train_net(inputs, outputs, ...
-            params.neurons_range, ...
-            params.num_training, ...
-            nettype{idx}, ...
-            params.trainset_sizes);
-
-    extra_data = [];
-    extra_data.bestN                = bestN;
-    extra_data.best_trainsize       = best_trainsize;
-    extra_data.mean_performances    = mean_performances;
+    nettype_data = [];
+    nettype_data.nettype        = type_;
+    nettype_data.undersampling  = params.unders;
+    nettype_data.trainset_sizes = params.trainset_sizes;
     
-    net_elem = create_net_elem(nettype, net, best_performance, extra_data);
-    best_networks.(nettype{idx}) = net_elem;
+    % Going backwards to preallocate struct matrix
+    for unders_idx = lenght(params.unders):-1:1
+        unders_ = params.unders(unders_idx);
+    
+        for trainset_idx = length(params.trainset_sizes):-1:1
+            size_ = params.trainset_sizes(trainset_idx);
+            
+            % Filtering on
+            with_filtering(unders_idx, trainset_idx) = [];
+            
+            % true = filtering on
+            [inputs,outputs]  = select_input(trainset.inputs, trainset.outputs, traintype, size_, unders_, true);
 
+            trained_data = ...
+                train_net(inputs, outputs, params.neurons_range, params.num_training, type_);
+
+            with_filtering(unders_idx, trainset_idx) = trained_data;
+
+            % Filtering off
+            without_filtering(unders_idx, trainset_idx) = [];
+            
+            % false = filtering off
+            [inputs,outputs]  = select_input(trainset.inputs, trainset.outputs, traintype, size_, unders_, false);
+
+            trained_data = ...
+                train_net(inputs, outputs, params.neurons_range, params.num_training, type_);
+
+            without_filtering(unders_idx, trainset_idx) = trained_data;
+        end
+    end
+    
+    nettype_data.with_filtering    = with_filtering;
+    nettype_data.without_filtering = without_filtering;
+    
+    results.(type_) = nettype_data;
+    
     if deterministic
         rng(s);
     end
@@ -54,29 +89,70 @@ end
 
 end
 
-function [net_elem] = create_net_elem(netname, net, performance, extra_data)
-
-net_elem = [];
-net_elem.netname        = netname;
-net_elem.net            = net;
-net_elem.performance    = performance;
-net_elem.extra_data     = extra_data;
-
-end
-
-function inputs = select_input(inputs,traintype, filter)
+function [inputs,outputs] = select_input(inputs, outputs, traintype, train_size, unders, filter_)
 %SELECT_INPUT Summary of this function goes here
 %   Detailed explanation goes here
 
-inputs = inputs.(traintype);
+inputs  = inputs.(traintype);
 
-if strcmp(traintype, 'spectra') && nargin > 2
-    inputs_ = inputs;
+[n, ~]  = size(inputs);
+if train_size < n
+    % Extract randomly a subset of the training set
+    idxs = randsample(1:n, train_size, false);
     
-    [n,m] = spectra;
+    inputs  = inputs(:, idxs);
+    outputs = outputs(:,idxs);
+end
+
+if strcmp(traintype, 'spectra') && nargin > 5 && filter_
+    [m,n] = size(inputs);
     
-    for i = 1:filter:
+    spectra = inputs(:, 1:n/2);
+    perturbations = inputs(:, n/2+1:end);
     
+    n = n/2;
+    
+    filtered_spectra    = zeros(m,n);
+    filtered_pert       = zeros(m,n);
+    
+    w = 3;
+    b = (1/w) * ones(1,w);
+    a = 1;
+    
+    delay       = mean(grpdelay(b,a));
+    filt_idxs   = delay*2+1:n;
+    
+    % wave_idxs = delay+1:length(wavelengths)-delay;
+    % wave_ = wavelengths(wave_idxs);
+    
+    for i = 1:m
+        filtered_spectra(i, :)  = filter(b,a, spectra(i, :));
+        filtered_pert(i, :)     = filter(b,a, perturbations(i, :));
+    end
+    
+    filt_s = filtered_spectra(:, filt_idxs);
+    filt_p = filtered_pert(:, filt_idxs);
+    
+    inputs = [filt_s filt_p];
+end
+
+if strcmp(traintype, 'spectra') && nargin > 4 && unders > 1
+    [m,n] = size(inputs);
+    
+    inputs_ = zeros(m, (floor(n/2 / unders)+1)*2);
+    
+    j = 1;
+    for i = 1:unders:n/2
+        inputs_(:, j) = inputs(:, i);
+        j = j+1;
+    end
+    
+    for i = n/2+1:unders:n
+        inputs_(:, j) = inputs(:, i);
+        j = j+1;
+    end
+    
+    inputs = inputs_;
 end
 
 end

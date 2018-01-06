@@ -25,6 +25,8 @@ switch deltaeversion
         deltaHab    = sqrt(deltaA^2 + deltaB^2 + deltaCab^2);
         
         KL          = 2;
+        KC          = 1;
+        KH          = 1;
         K1          = 0.048;
         K2          = 0.014;
         

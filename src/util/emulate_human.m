@@ -1,6 +1,7 @@
 function emulate_human(spectra, perturbations, fname, deltaeversion)
 %EMULATE_HUMAN Summary of this function goes here
 %   Detailed explanation goes here
+% deltaeversion = 'CIE76' or 'CIE94';
 
 [Nspectra, Nperturbations, ~] = size(perturbations);
 
@@ -59,7 +60,18 @@ save(fname, ...
 
 end
 
+function rating = deltae2rating(deltae)
+if deltae < 1.7
+    rating = 2;
+elseif deltae < 4.9
+    rating = 1;
+else
+    rating = 0;
+end
+end
 
+
+%{
 function rating = deltae2rating(deltae)
 if deltae < 1.2
     rating = 5;
@@ -75,3 +87,4 @@ else
     rating = 0;
 end
 end
+%}

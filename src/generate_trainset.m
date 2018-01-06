@@ -26,6 +26,7 @@ inputs.spectra  = zeros(Npairs, 2 * Nwavelengths);
 inputs.xyz      = zeros(Npairs, 6);
 inputs.lab      = zeros(Npairs, 6);
 inputs.rgb      = zeros(Npairs, 6);
+inputs.deltae   = zeros(Npairs, 1);
 
 outputs         = zeros(Npairs, 1);
 outputs(1:end)  = vars.ratings;
@@ -46,17 +47,19 @@ for i = 1:Npairs
     inputs.spectra(i, 1:Nwavelengths) = spectrum;
     inputs.spectra(i, Nwavelengths+1:end) = perturbation;
     
-    [xyz, rgb, lab] = spectra2color(spectrum);
+    [xyz, rgb, lab1] = spectra2color(spectrum);
     
     inputs.xyz(i, 1:3) = xyz;
-    inputs.lab(i, 1:3) = lab;
+    inputs.lab(i, 1:3) = lab1;
     inputs.rgb(i, 1:3) = rgb;
     
-    [xyz, rgb, lab] = spectra2color(perturbation);
+    [xyz, rgb, lab2] = spectra2color(perturbation);
     
     inputs.xyz(i, 4:6) = xyz;
-    inputs.lab(i, 4:6) = lab;
+    inputs.lab(i, 4:6) = lab2;
     inputs.rgb(i, 4:6) = rgb;
+    
+    inputs.deltae(i) = delta_e(lab1, lab2, 'CIE94');
 end
 
 close(waitbar_h);

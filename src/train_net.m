@@ -1,5 +1,6 @@
-function [bestN, best_net, best_performance, mean_performances, best_trainsize] = ...
-        train_net(inputs, outputs, neurons_range, num_training, nettype, trainset_sizes)
+%function [bestN, best_net, best_performance, mean_performances, best_trainsize, best_x, best_t, best_y] = ...
+function [trained_data] = ...
+        train_net(inputs, outputs, neurons_range, num_training, nettype)
 
 %EVALUATE_MLP	Evaluates the best MLP network size N for the given problem.
 %
@@ -33,8 +34,10 @@ function [bestN, best_net, best_performance, mean_performances, best_trainsize] 
 %   See also EVALUATE, EVALUATE_RBF.
 %
 
+neurons_len = length(neurons_range);
+
 % Variables used to update the waitbar
-waitbar_total   = length(neurons_range)*num_training*length(trainset_sizes);
+waitbar_total   = neurons_len * num_training;
 waitbar_partial = 0;
 waitbar_h = waitbar(0, ['Training ' nettype ' networks...']);
 
@@ -42,100 +45,109 @@ waitbar_h = waitbar(0, ['Training ' nettype ' networks...']);
 x = inputs';
 t = outputs';
 
-[~,m] = size(x);
+trained_data = [];
 
-if strcmp(nettype,'pattern')
-    % The generalized add because classes for me go from 0 to 5 
-    t = full(ind2vec(gadd(t,1)));
+trained_data.nettype        = nettype;
+trained_data.neurons_range  = neurons_range;
+trained_data.x              = x;
+trained_data.t              = t;
+
+trained_data.bestN      = -1;
+trained_data.best_net   = [];
+trained_data.best_perf  = Inf;
+
+if strcmp(nettype, 'pattern')
+    num_labels      = max(t);
+    tind            = t;
+    t               = full(ind2vec(t));
+    
+    trained_data.t      = t;
+    trained_data.tind   = tind;
+    
+    trained_data.best_error = Inf;
+    trained_data.best_auc   = 0;
+    
+    % Preallocation
+    errors      = zeros(neurons_len, num_training);
+    areas_uc    = zeros(neurons_len, num_training);
 end
 
 % Preallocation
-performances = zeros(length(neurons_range), length(trainset_sizes), num_training);
-
-% Placeholders for outputs
-bestN               = -1;
-best_net            = [];
-best_performance    = inf;
-
-xx = cell(length(trainset_sizes), 1);
-tt = cell(length(trainset_sizes), 1);
-ttind = cell(length(trainset_sizes), 1);
-
-for k = 1:length(trainset_sizes)
-    train_size = trainset_sizes(k);
-
-    % Extract randomly a subset of the training set
-    idxs = randsample(1:m, train_size, false);
-    xx{k} = x(:, idxs);
-    tt{k} = t(:, idxs);
-    
-    if strcmp(nettype,'pattern')
-        ttind{k} = vec2ind(tt{k});
-    end
-end
-
-
+performances = zeros(neurons_len, num_training);
 
 % i = index of the number neurons in the current network
-for i = 1:length(neurons_range)
+for i = 1:neurons_len
     
     neurons_number = neurons_range(i);
     
     % Initializating the network
     net = init_net(neurons_number, nettype);
     
-    for k = 1:length(trainset_sizes)
+    % j = counter of different trainings with the same network size
+    for j = 1:num_training
+
+        % Updating waitbar content, it will abort any operation if the
+        % waitbar has been closed.
+        waitbar_partial = waitbar_partial+1;
+        waitbar_update(waitbar_partial/waitbar_total, waitbar_h);
+
+        % Training the Network
+        [net] = train(net, x, t);
+
+        % Testing the Network
+        y = net(x);
         
-        train_size = trainset_sizes(k);
-        
-        x_ = xx{k};
-        t_ = tt{k};
-        
+        % Performance is evaluated on the whole training set
+        performance = perform(net, t, y);
+        performances(i,j)  = performance;
+
+        % Additional computations for pattern recognition
         if strcmp(nettype,'pattern')
-            tind = ttind{k};
-        end
-    
-        % j = counter of different trainings with the same network size
-        for j = 1:num_training
+            % Notice: this doesn't take care of the fact that an output
+            % "close" to the target may be "good" with respect to a
+            % completely different one
+            
+            yind        = vec2ind(y);
+            error_rate  = sum(tind ~= yind) / numel(tind);
 
-            % Updating waitbar content, it will abort any operation if the
-            % waitbar has been closed.
-            waitbar_partial = waitbar_partial+1;
-            waitbar_update(waitbar_partial/waitbar_total, waitbar_h);
-
-            % Training the Network
-            [net] = train(net, x_, t_);
-
-            % Testing the Network
-            y = net(x_);
-
-            % Performance is evaluated on the whole training set
-            if strcmp(nettype,'pattern')
-                yind = vec2ind(y);
-                performance = sum(tind ~= yind)/numel(tind); % Error rate
-                
-                % Notice: this doesn't take care of the fact that an output
-                % "close" to the target may be "good" with respect to a
-                % completely different one
-            else
-                performance = perform(net, t_, y);
+            area_under_curve = 0;
+            
+            for posc = 1:num_labels
+                [~,~,~,auc]         = perfcurve(t,y,posc);
+                area_under_curve    = area_under_curve + auc;
             end
+            
+            area_under_curve            = area_under_curve / num_labels;
+            
+            areas_uc(i,j)  = area_under_curve;
+            errors(i,j)    = error_rate;
 
-            % Saving data
-            performances(i, k, j)  = performance;
-
-            if performance < best_performance
-                bestN               = neurons_number;
-                best_trainsize      = train_size;
-                best_net            = net;
-                best_performance    = performance;
+            if error_rate < trained_data.best_error
+                % Saving best data
+                trained_data.bestN      = neurons_number;
+                trained_data.best_net   = net;
+                trained_data.best_perf  = performance;
+                trained_data.best_error = error_rate;
+                trained_data.best_auc   = area_under_curve;
+            end
+        else
+            if performance < trained_data.best_perf
+                % Saving best data
+                trained_data.bestN      = neurons_number;
+                trained_data.best_net   = net;
+                trained_data.best_perf  = performance;
             end
         end
     end
 end
 
 % Obtaining mean performances for each network size and training size
-mean_performances   = mean(performances, 3);
+trained_data.mean_perf = mean(performances, 2);
+
+if strcmp(nettype,'pattern')
+    trained_data.mean_auc   = mean(areas_uc, 2);
+    trained_data.mean_error = mean(errors, 2);
+end
 
 close(waitbar_h);
 
@@ -147,7 +159,7 @@ function net = init_net(neurons_number, nettype)
 %
 %   See also EVALUATE_MLP.
 
-% TODO: Choose training function.
+% Choose training function.
 % 'trainlm' is usually fastest.
 % 'trainbr' takes longer but may be better for challenging problems.
 % 'trainscg' uses less memory. Suitable in low memory situations.
@@ -176,13 +188,13 @@ net.divideParam.testRatio   = 15/100;
 net.trainParam.showWindow       = false;
 net.trainParam.showCommandLine  = false;
 
-% TODO: Choose a Performance Function
+% Choose a Performance Function
 % 'mae'          - Mean absolute error performance function.
 % 'mse'          - Mean squared error performance function.
 % 'sae'          - Sum absolute error performance function.
 % 'sse'          - Sum squared error performance function.
 % 'crossentropy' - Cross-entropy performance.
 % 'msesparse'    - Mean squared error performance function with L2 weight and sparsity regularizers.
-net.performFcn = 'crossentropy';  % Cross-Entropy
+net.performFcn = 'crossentropy';
 
 end

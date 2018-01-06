@@ -1,17 +1,24 @@
-best_networks = train_networks(trainset, 'pattern', 'lab');
+if ~exist('trainset', 'var')
+   load('fast_eval_simple.mat'); 
+end
+
+best_networks = train_networks(trainset, 'pattern', 'spectra');
 pattern = best_networks.pattern;
-t = trainset.outputs;
-t = t';
-t = full(ind2vec(gadd(t,1)));
-x = trainset.inputs.lab';
-y = pattern.net(x);
+
+%%
+
+x = pattern.extra_data.best_x;
+t = pattern.extra_data.best_t;
+y = pattern.extra_data.best_y;
 
 %%
 
 figure
 plotconfusion(t,y);
+pause;
 figure
 plotroc(t,y);
+pause;
 pattern.extra_data
 perf = pattern.extra_data.mean_performances;
 [~, m] = size(perf);
