@@ -195,6 +195,10 @@ net.trainParam.showCommandLine  = false;
 % 'sse'          - Sum squared error performance function.
 % 'crossentropy' - Cross-entropy performance.
 % 'msesparse'    - Mean squared error performance function with L2 weight and sparsity regularizers.
-net.performFcn = 'crossentropy';
+if strcmp(nettype, 'fit')
+    net.performFcn = 'mse';
+else
+    net.performFcn = 'crossentropy';
+end
 
 end

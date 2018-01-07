@@ -1,6 +1,10 @@
 function [xyz, rgb, lab, valid] = spectra2color(spectra)
 
-init_patch_library;
+persistent d65 xFcn yFcn zFcn kNorm;
+
+if isempty(d65)
+    init_patch_library;
+end
 
 spectra = squeeze(spectra);
 

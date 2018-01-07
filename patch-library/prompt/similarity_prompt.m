@@ -22,7 +22,7 @@ function varargout = similarity_prompt(varargin)
 
 % Edit the above text to modify the response to help similarity_prompt
 
-% Last Modified by GUIDE v2.5 29-Dec-2017 09:17:22
+% Last Modified by GUIDE v2.5 07-Jan-2018 18:25:54
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -327,7 +327,7 @@ if not(valid)
     return;
 end
 
-handles.state.deltaE = delta_e(handles.state.orig.lab, handles.state.pert.lab);
+handles.state.deltaE = delta_e(handles.state.orig.lab, handles.state.pert.lab, 'CIE94');
 
 
 function handles = change_state(handles, move, first_call)
@@ -394,7 +394,7 @@ handles.similarityLevel.SelectedObject = get_selected_radiobutton(handles);
 how_many_visited = length(handles.globals.ratings) + handles.globals.invalid;
 progressRatio = how_many_visited / handles.consts.n_pairs * 100;
 progressRatio = floor(progressRatio * 10) / 10;
-handles.progressRatio.String = strcat(mat2str(progressRatio), '/100');
+handles.progressRatio.String = [mat2str(how_many_visited), '  pairs       ', mat2str(progressRatio), ' / 100'];
 
 % Showing current patches
 axis(handles.patches);
@@ -412,8 +412,6 @@ set(handles.patches, 'YTick', []);
 function rating = get_saved_rating(handles)
 
 switch handles.similarityLevel.SelectedObject.Tag
-    case 'radio0'
-        rating = 0;
     case 'radio1'
         rating = 1;
     case 'radio2'
@@ -422,8 +420,6 @@ switch handles.similarityLevel.SelectedObject.Tag
         rating = 3;
     case 'radio4'
         rating = 4;
-    case 'radio5'
-        rating = 5;
     otherwise
         error('Currently selected object is invalid: %s!', handles.similarityLevel.SelectedObject.tag)
 end
@@ -432,14 +428,12 @@ end
 function obj = get_selected_radiobutton(handles)
 
 if handles.globals.cur_pair_idx > length(handles.globals.ratings)
-    obj = handles.radio0;
+    obj = handles.radio1;
     return;
 end
 
 rating = handles.globals.ratings(handles.globals.cur_pair_idx);
 switch rating
-    case 0
-        obj = handles.radio0;
     case 1
         obj = handles.radio1;
     case 2
@@ -448,8 +442,6 @@ switch rating
         obj = handles.radio3;
     case 4
         obj = handles.radio4;
-    case 5
-        obj = handles.radio5;
     otherwise
         error('Unexpected rayting value: %d', rating);
 end

@@ -2,7 +2,9 @@ if ~exist('trainset', 'var')
    load('fast_eval_simple.mat'); 
 end
 
-results = train_networks(trainset, {'pattern';'fit'}, 'spectra', true);
+%results = train_networks(trainset, {'fit'; 'pattern'}, 'spectra', true);
+
+results = train_networks(trainset, {'fit'; 'pattern'}, 'lab', true);
 
 save('results.mat', 'results');
 %pattern = results.pattern;

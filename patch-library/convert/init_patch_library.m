@@ -1,3 +1,4 @@
+global a b;
 [d65, xFcn, yFcn, zFcn, kNorm] = init();
 
 
@@ -8,20 +9,19 @@ MINIMUM_LAMBDA = 380;
 MAXIMUM_LAMBDA = 800;
 
 % Initializing the light
-
 [lambda, D65] = illuminant('d65');
 light = D65(lambda >= MINIMUM_LAMBDA & lambda <= MAXIMUM_LAMBDA);
 
-
-
 % Initializing the three color matching functions
-
 [lambda, xFcn, yFcn, zFcn] = colorMatchFcn('1931_full');
 idxs = lambda >= MINIMUM_LAMBDA & lambda <= MAXIMUM_LAMBDA;
 
 xFcn = xFcn(idxs);
 yFcn = yFcn(idxs);
 zFcn = zFcn(idxs);
+
+a = yFcn;
+b = light;
 
 % Calculating the normalization factor
 kNorm = yFcn * light;

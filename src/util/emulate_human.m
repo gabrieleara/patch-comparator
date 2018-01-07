@@ -61,6 +61,7 @@ save(fname, ...
 end
 
 function rating = deltae2rating(deltae)
+deltae = deltae + normrnd(0, 2); % Simulating error (5/10)
 if deltae < 1.7
     rating = 4;
 elseif deltae < 3.6
