@@ -8,52 +8,53 @@ if nargin < 3
     interactive = false;
 end
 
-params.trainset_sizes   = 25:75:250;  % 75:75:1500
-params.neurons_range    = 5:5:25;     % 2:3:20;
+params.trainset_sizes   = 75:75:1500;   % 25:75:250;
+params.neurons_range    = 2:1:20;      % 5:5:25;
 params.num_training     = 15;
 
 params.undersampling = 1;
 params = generate_spectra_plotsdata(params);
 
-[res, in, out] = test_spectra(trainset, params);
-plot_results(res, in, out, params, interactive);
+[res, in, out]  = test_spectra(trainset, params);
+best_net        = plot_results(res, in, out, params, interactive);
 
 results.spectra{params.undersampling}   = res;
 inputs.spectra{params.undersampling}    = in;
 outputs.spectra{params.undersampling}   = out;
+best_nets.spectra{params.undersampling} = best_net;
 
 for i = 5:15:50
     params.undersampling = i;
     params = generate_spectra_plotsdata(params);
     
-    [res, in, out] = test_spectra(trainset, params);
-    plot_results(res, in, out, params, interactive);
+    [res, in, out]  = test_spectra(trainset, params);
+    best_net        = plot_results(res, in, out, params, interactive);
     
     results.spectra{params.undersampling}   = res;
     inputs.spectra{params.undersampling}    = in;
     outputs.spectra{params.undersampling}   = out;
+    best_nets.spectra{params.undersampling} = best_net;
 end
 
 params = generate_lab_plotsdata(params);
 [res, in, out] = test_lab(trainset, params);
-best_dim = plot_results(res, in, out, params, interactive)
+best_net = plot_results(res, in, out, params, interactive);
 
-results.lab = res;
-in.lab      = in;
-out.lab     = out;
+results.lab     = res;
+inputs.lab      = in;
+outputs.lab     = out;
+best_nets.lab   = best_net;
 
-results.spectra     = sparse(results.spectra);
-inputs.spectra      = sparse(in.spectra);
-outputs.spectra     = sparse(out.spectra);
+% Sparse doesn't work for cells
+% results.spectra     = sparse(results.spectra);
+% inputs.spectra      = sparse(in.spectra);
+% outputs.spectra     = sparse(out.spectra);
+% best_nets.spectra   = sparse(best_nets.spectra);
 
+% [res, in, out] = test_lab_final(trainset, params, best_dim)
+% plot_results(res, in, out, params, interactive);
 
-
-%[res, in, out] = test_lab_final(trainset, params, best_dim)
-%plot_results(res, in, out, params, interactive);
-
-
-
-save(fname, 'results', 'inputs', 'outputs');
+save(fname, 'results', 'inputs', 'outputs', 'best_nets');
 
 end
 
@@ -153,7 +154,7 @@ res = trained_data;
 
 end
 
-function best_dim = plot_results(res, in, out, params, interactive)
+function [best_net, best_dim] = plot_results(res, in, out, params, interactive)
 
 %% Plot A
 
@@ -255,4 +256,6 @@ if ishandle(fig)
 end
 
 best_dim = params.trainset_sizes(i);
+best_net = net;
+
 end
