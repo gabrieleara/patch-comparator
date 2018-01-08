@@ -56,6 +56,8 @@ trained_data.bestN      = -1;
 trained_data.best_net   = [];
 trained_data.best_perf  = Inf;
 
+trained_data.best_N_net     = cell(neurons_len, 1);
+
 if strcmp(nettype, 'pattern')
     num_labels      = max(t);
     tind            = t;
@@ -68,12 +70,12 @@ if strcmp(nettype, 'pattern')
     trained_data.best_auc   = 0;
     
     % Preallocation
-    errors      = zeros(neurons_len, num_training);
-    areas_uc    = zeros(neurons_len, num_training);
+    errors      = inf(neurons_len, num_training);
+    areas_uc    = inf(neurons_len, num_training);
 end
 
 % Preallocation
-performances = zeros(neurons_len, num_training);
+performances = inf(neurons_len, num_training);
 
 % i = index of the number neurons in the current network
 for i = 1:neurons_len
@@ -130,12 +132,20 @@ for i = 1:neurons_len
                 trained_data.best_error = error_rate;
                 trained_data.best_auc   = area_under_curve;
             end
+            
+            if error_rate <= min(errors(i, :))
+                trained_data.best_N_net{i} = net;
+            end
         else
             if performance < trained_data.best_perf
                 % Saving best data
                 trained_data.bestN      = neurons_number;
                 trained_data.best_net   = net;
                 trained_data.best_perf  = performance;
+            end
+            
+            if performance <= min(performances(i, :))
+                trained_data.best_N_net{i} = net;
             end
         end
     end

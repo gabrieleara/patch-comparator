@@ -22,7 +22,7 @@ function varargout = similarity_prompt(varargin)
 
 % Edit the above text to modify the response to help similarity_prompt
 
-% Last Modified by GUIDE v2.5 07-Jan-2018 18:25:54
+% Last Modified by GUIDE v2.5 08-Jan-2018 09:11:11
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -227,6 +227,16 @@ handles.state.show_deltaE = not(handles.state.show_deltaE);
 handles = update_deltae_tab(handles);
 guidata(hObject, handles);
 
+% --- Executes when selected object is changed in similarityLevel.
+function similarityLevel_SelectionChangedFcn(hObject, ~, handles)
+% hObject    handle to the selected object in similarityLevel 
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+handles.state.show_deltaE = true;
+handles = update_deltae_tab(handles);
+guidata(hObject, handles);
+
 
 % --- Executes during object creation, after setting all properties.
 function similarityPrompt_CreateFcn(hObject, ~, handles)
@@ -332,6 +342,8 @@ handles.state.deltaE = delta_e(handles.state.orig.lab, handles.state.pert.lab, '
 
 function handles = change_state(handles, move, first_call)
 
+persistent fig;
+
 if nargin < 3
     first_call = false;
 end
@@ -341,6 +353,16 @@ if move == 1
         handles = save_state(handles);
     end
     how_many_visited = length(handles.globals.ratings);
+    
+    if how_many_visited > 0 && ~mod(how_many_visited, 50)
+        fig = figure;
+        histogram(handles.globals.ratings);
+        figure(handles.similarityPrompt);
+    end
+    
+    if mod(how_many_visited, 50) == 1
+        close(fig);
+    end
 end
 
 % Move can be either -1 or +1
@@ -394,7 +416,9 @@ handles.similarityLevel.SelectedObject = get_selected_radiobutton(handles);
 how_many_visited = length(handles.globals.ratings) + handles.globals.invalid;
 progressRatio = how_many_visited / handles.consts.n_pairs * 100;
 progressRatio = floor(progressRatio * 10) / 10;
-handles.progressRatio.String = [mat2str(how_many_visited), '  pairs       ', mat2str(progressRatio), ' / 100'];
+handles.progressRatio.String = ...
+    [mat2str(length(handles.globals.ratings)), '  pairs       ', ...
+    mat2str(progressRatio), ' / 100'];
 
 % Showing current patches
 axis(handles.patches);
